@@ -22,5 +22,5 @@
                 "CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y",
                "CONFIG_PARTITION_TABLE_CUSTOM_FILENAME=\"partitions/v2/4m.csv\""
            ]
-         }
+        }
 }
