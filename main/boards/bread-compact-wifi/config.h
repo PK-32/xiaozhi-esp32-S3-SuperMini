@@ -6,7 +6,7 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
-// If using Duplex I2S mode, please comment out the following line
+// If using Duplex I2S mode, please comment out the following line:
 #define AUDIO_I2S_METHOD_SIMPLEX
 
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
