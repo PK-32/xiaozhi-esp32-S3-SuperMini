@@ -6,7 +6,6 @@
 #define AUDIO_INPUT_SAMPLE_RATE  16000
 #define AUDIO_OUTPUT_SAMPLE_RATE 24000
 
-// If using Duplex I2S mode, please comment out the following line
 #define AUDIO_I2S_METHOD_SIMPLEX
 
 #ifdef AUDIO_I2S_METHOD_SIMPLEX
@@ -28,7 +27,7 @@
 #endif
 
 
-#define BUILTIN_LED_GPIO        GPIO_NUM_12
+#define BUILTIN_LED_GPIO        GPIO_NUM_48
 #define BOOT_BUTTON_GPIO        GPIO_NUM_1
 #define TOUCH_BUTTON_GPIO       GPIO_NUM_47
 #define VOLUME_UP_BUTTON_GPIO   GPIO_NUM_10
@@ -54,6 +53,6 @@
 
 
 // A MCP Test: Control a lamp
-#define LAMP_GPIO GPIO_NUM_18
+#define LAMP_GPIO GPIO_NUM_12
 
 #endif // _BOARD_CONFIG_H_
