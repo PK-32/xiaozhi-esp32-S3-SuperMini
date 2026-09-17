@@ -146,6 +146,11 @@ bool OledDisplay::Lock(int timeout_ms) { return lvgl_port_lock(timeout_ms); }
 void OledDisplay::Unlock() { lvgl_port_unlock(); }
 
 void OledDisplay::SetChatMessage(const char* role, const char* content) {
+      // Robot-face layout: chat text is intentionally not shown.-----------------
+    if (left_eye_ != nullptr) {
+        return;
+    }
+  //----------------Added above block so that chat text won't cover the face--------
     DisplayLockGuard lock(this);
     if (chat_message_label_ == nullptr) {
         return;
@@ -301,6 +306,87 @@ void OledDisplay::SetupUI_128x64() {
     lv_obj_set_style_text_color(low_battery_label_, lv_color_white(), 0);
     lv_obj_center(low_battery_label_);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
+  //--------Added face Setup-------------------------------------
+    SetupFace();
+}
+//------------Added Face Setup Function------------------------------
+// Creates a robot face from plain shapes. The whole normal UI (icons, emoji,
+// chat text) lives inside container_, so hiding that leaves only the status
+// bar (Listening/Speaking) plus the face drawn here.
+void OledDisplay::SetupFace() {
+    auto screen = lv_screen_active();
+
+    lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
+
+    left_eye_ = lv_obj_create(screen);
+    lv_obj_remove_style_all(left_eye_);
+    lv_obj_remove_flag(left_eye_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(left_eye_, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(left_eye_, LV_OPA_COVER, 0);
+
+    right_eye_ = lv_obj_create(screen);
+    lv_obj_remove_style_all(right_eye_);
+    lv_obj_remove_flag(right_eye_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(right_eye_, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(right_eye_, LV_OPA_COVER, 0);
+
+    mouth_ = lv_obj_create(screen);
+    lv_obj_remove_style_all(mouth_);
+    lv_obj_remove_flag(mouth_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_style_bg_color(mouth_, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(mouth_, LV_OPA_COVER, 0);
+
+    SetFaceShape("neutral");
+}
+
+// Re-positions and re-sizes the eyes/mouth for a given emotion name.
+// Screen is 128x64; the top 16px are reserved for the status bar.
+void OledDisplay::SetFaceShape(const char* emotion) {
+    if (left_eye_ == nullptr || right_eye_ == nullptr || mouth_ == nullptr) {
+        return;
+    }
+
+    std::string e = (emotion == nullptr) ? "neutral" : emotion;
+
+    // Defaults: neutral face
+    int eye_w = 24, eye_h = 24, eye_y = 22, eye_r = 8, eye_gap = 16;
+    int mouth_w = 26, mouth_h = 6, mouth_y = 52, mouth_r = 3;
+
+    if (e == "happy" || e == "laughing" || e == "funny" || e == "silly") {
+        eye_h = 10; eye_y = 28; eye_r = 5;
+        mouth_w = 40; mouth_h = 10; mouth_y = 48; mouth_r = 5;
+    } else if (e == "sad" || e == "crying") {
+        eye_h = 16; eye_y = 28; eye_r = 8;
+        mouth_w = 16; mouth_h = 4; mouth_y = 56; mouth_r = 2;
+    } else if (e == "angry") {
+        eye_h = 12; eye_y = 26; eye_r = 2;
+        mouth_w = 20; mouth_h = 4; mouth_y = 54; mouth_r = 2;
+    } else if (e == "surprised" || e == "shocked") {
+        eye_w = 26; eye_h = 26; eye_y = 20; eye_r = 13; eye_gap = 14;
+        mouth_w = 14; mouth_h = 14; mouth_y = 48; mouth_r = 7;
+    } else if (e == "sleepy" || e == "relaxed") {
+        eye_h = 4; eye_y = 32; eye_r = 2;
+        mouth_w = 18; mouth_h = 4; mouth_y = 54; mouth_r = 2;
+    } else if (e == "thinking" || e == "confused") {
+        eye_h = 18; eye_y = 26; eye_r = 9;
+        mouth_w = 12; mouth_h = 6; mouth_y = 52; mouth_r = 3;
+    }
+
+    int left_x = (LV_HOR_RES / 2) - (eye_gap / 2) - eye_w;
+    int right_x = (LV_HOR_RES / 2) + (eye_gap / 2);
+    int mouth_x = (LV_HOR_RES / 2) - (mouth_w / 2);
+
+    lv_obj_set_size(left_eye_, eye_w, eye_h);
+    lv_obj_set_pos(left_eye_, left_x, eye_y);
+    lv_obj_set_style_radius(left_eye_, eye_r, 0);
+
+    lv_obj_set_size(right_eye_, eye_w, eye_h);
+    lv_obj_set_pos(right_eye_, right_x, eye_y);
+    lv_obj_set_style_radius(right_eye_, eye_r, 0);
+
+    lv_obj_set_size(mouth_, mouth_w, mouth_h);
+    lv_obj_set_pos(mouth_, mouth_x, mouth_y);
+    lv_obj_set_style_radius(mouth_, mouth_r, 0);
 }
 
 void OledDisplay::SetupUI_128x32() {
@@ -392,6 +478,12 @@ void OledDisplay::SetupUI_128x32() {
 }
 
 void OledDisplay::SetEmotion(const char* emotion) {
+      // Drawn robot face takes over when it exists (128x64 layout).
+    if (left_eye_ != nullptr) {
+        DisplayLockGuard lock(this);
+        SetFaceShape(emotion);
+        return;
+    }
     auto lvgl_theme = static_cast<LvglTheme*>(current_theme_);
     const char* utf8 = noto_emoji_get_utf8(emotion);
     const lv_font_t* emotion_font = lvgl_theme->emoji_font()->font();
