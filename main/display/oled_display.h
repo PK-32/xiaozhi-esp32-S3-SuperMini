@@ -19,14 +19,29 @@ private:
     lv_obj_t* content_right_ = nullptr;
     lv_obj_t* container_ = nullptr;
     lv_obj_t* side_bar_ = nullptr;
-    lv_obj_t *emotion_label_ = nullptr;
+    // lv_obj_t *emotion_label_ = nullptr;
+    // lv_obj_t* chat_message_label_ = nullptr;
+
+    // virtual bool Lock(int timeout_ms = 0) override;
+    // virtual void Unlock() override;
+
+    // void SetupUI_128x64();
+    // void SetupUI_128x32();
+    lv_obj_t* emotion_label_ = nullptr;
     lv_obj_t* chat_message_label_ = nullptr;
+
+    // Robot face drawn from shapes (not glyphs)
+    lv_obj_t* left_eye_ = nullptr;
+    lv_obj_t* right_eye_ = nullptr;
+    lv_obj_t* mouth_ = nullptr;
 
     virtual bool Lock(int timeout_ms = 0) override;
     virtual void Unlock() override;
 
     void SetupUI_128x64();
     void SetupUI_128x32();
+    void SetupFace();
+    void SetFaceShape(const char* emotion);
 
 public:
     OledDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_handle_t panel, int width, int height, bool mirror_x, bool mirror_y);
