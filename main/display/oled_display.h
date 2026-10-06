@@ -6,6 +6,17 @@
 #include <esp_lcd_panel_io.h>
 #include <esp_lcd_panel_ops.h>
 
+// One face "pose": eye / eyebrow / mouth geometry in pixels.
+// Screen is 128x64; the top 16px belong to the status text.
+struct FacePose {
+    int eye_w = 24, eye_h = 24, eye_y = 22, eye_r = 8, eye_gap = 16;
+    int brow = 0;          // 0 none, 1 low & flat (angry/smug), 2 raised (sad), 3 high (surprised)
+    int asym = 0;          // right eye height minus left eye height (confused/silly)
+    bool wink = false;     // left eye closed
+    int look_dx = 0;       // gaze offset in pixels
+    int mouth_w = 26, mouth_h = 6, mouth_y = 52, mouth_r = 3, mouth_dx = 0;
+    int mouth_style = 0;   // 0 plain, 1 smile (flat top), 2 frown (flat bottom)
+};
 
 class OledDisplay : public LvglDisplay {
 private:
