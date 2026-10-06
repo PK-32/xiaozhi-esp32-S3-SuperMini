@@ -12,6 +12,9 @@
 #include <material_symbols.h>
 #include <noto_emoji.h>
 
+#include "application.h"
+#include <esp_random.h>
+
 #define TAG "OledDisplay"
 
 LV_FONT_DECLARE(BUILTIN_TEXT_FONT);
