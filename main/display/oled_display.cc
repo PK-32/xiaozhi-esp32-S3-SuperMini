@@ -312,84 +312,230 @@ void OledDisplay::SetupUI_128x64() {
   //--------Added face Setup-------------------------------------
     SetupFace();
 }
-//------------Added Face Setup Function------------------------------
-// Creates a robot face from plain shapes. The whole normal UI (icons, emoji,
-// chat text) lives inside container_, so hiding that leaves only the status
-// bar (Listening/Speaking) plus the face drawn here.
+// ===== Robot face =====
+namespace {
+
+struct FaceEntry {
+    const char* name;
+    FacePose pose;
+};
+
+// Fields are listed in struct order; anything omitted keeps the neutral default.
+const FaceEntry kFaces[] = {
+    {"neutral",     {}},
+    {"happy",       {.eye_h = 18, .eye_y = 24, .eye_r = 9, .mouth_w = 34, .mouth_h = 10, .mouth_y = 47, .mouth_style = 1}},
+    {"laughing",    {.eye_h = 8, .eye_y = 30, .eye_r = 4, .mouth_w = 42, .mouth_h = 14, .mouth_y = 45, .mouth_style = 1}},
+    {"funny",       {.eye_h = 20, .eye_y = 23, .mouth_w = 38, .mouth_h = 12, .mouth_y = 46, .mouth_style = 1}},
+    {"silly",       {.eye_h = 20, .eye_y = 22, .asym = 8, .mouth_w = 30, .mouth_h = 10, .mouth_y = 47, .mouth_dx = 4, .mouth_style = 1}},
+    {"sad",         {.eye_w = 20, .eye_h = 18, .eye_y = 27, .eye_r = 9, .brow = 2, .mouth_w = 24, .mouth_h = 7, .mouth_y = 52, .mouth_style = 2}},
+    {"crying",      {.eye_w = 22, .eye_h = 12, .eye_y = 29, .eye_r = 6, .brow = 2, .mouth_w = 20, .mouth_h = 12, .mouth_y = 49, .mouth_r = 6}},
+    {"angry",       {.eye_h = 14, .eye_y = 27, .eye_r = 3, .brow = 1, .mouth_w = 28, .mouth_h = 7, .mouth_y = 52, .mouth_style = 2}},
+    {"surprised",   {.eye_h = 26, .eye_y = 22, .eye_r = 13, .eye_gap = 14, .brow = 3, .mouth_w = 12, .mouth_h = 13, .mouth_y = 49, .mouth_r = 7}},
+    {"shocked",     {.eye_w = 28, .eye_h = 28, .eye_y = 19, .eye_r = 14, .eye_gap = 12, .mouth_w = 16, .mouth_h = 14, .mouth_y = 48, .mouth_r = 8}},
+    {"thinking",    {.eye_w = 22, .eye_h = 22, .eye_r = 11, .look_dx = 5, .mouth_w = 10, .mouth_h = 6, .mouth_y = 53, .mouth_dx = 8}},
+    {"confused",    {.eye_h = 22, .eye_y = 24, .asym = -8, .mouth_w = 16, .mouth_h = 4, .mouth_y = 54, .mouth_r = 2, .mouth_dx = -6}},
+    {"winking",     {.eye_h = 22, .eye_y = 23, .wink = true, .mouth_w = 30, .mouth_h = 9, .mouth_y = 48, .mouth_style = 1}},
+    {"loving",      {.eye_w = 26, .eye_h = 26, .eye_y = 20, .eye_r = 13, .eye_gap = 12, .mouth_w = 26, .mouth_h = 8, .mouth_y = 50, .mouth_style = 1}},
+    {"embarrassed", {.eye_w = 18, .eye_h = 18, .eye_y = 26, .eye_r = 9, .eye_gap = 22, .look_dx = -3, .mouth_w = 12, .mouth_h = 5, .mouth_y = 54, .mouth_r = 2, .mouth_dx = -3}},
+    {"delicious",   {.eye_h = 10, .eye_y = 28, .eye_r = 5, .mouth_w = 36, .mouth_h = 14, .mouth_y = 46, .mouth_style = 1}},
+    {"confident",   {.eye_h = 16, .eye_y = 27, .eye_r = 5, .brow = 1, .mouth_w = 26, .mouth_h = 6, .mouth_y = 51, .mouth_dx = 4, .mouth_style = 1}},
+    {"cool",        {.eye_w = 28, .eye_h = 10, .eye_y = 27, .eye_r = 3, .eye_gap = 8, .mouth_w = 22, .mouth_h = 5, .mouth_y = 52, .mouth_dx = 4, .mouth_style = 1}},
+    {"kissy",       {.eye_h = 10, .eye_y = 28, .eye_r = 5, .mouth_w = 9, .mouth_h = 9, .mouth_y = 51, .mouth_r = 5}},
+    {"relaxed",     {.eye_h = 6, .eye_y = 31, .eye_r = 3, .mouth_w = 24, .mouth_h = 6, .mouth_y = 51, .mouth_style = 1}},
+    {"sleepy",      {.eye_w = 22, .eye_h = 4, .eye_y = 33, .eye_r = 2, .mouth_w = 10, .mouth_h = 9, .mouth_y = 51, .mouth_r = 5}},
+};
+
+const FacePose* FindExact(const std::string& name) {
+    for (const auto& f : kFaces) {
+        if (name == f.name) return &f.pose;
+    }
+    return nullptr;
+}
+
+// Exact name first, then loose keyword match, otherwise neutral.
+const FacePose& FindPose(const std::string& e) {
+    if (auto p = FindExact(e)) return *p;
+
+    struct Alias { const char* key; const char* target; };
+    static const Alias kAliases[] = {
+        {"laugh", "laughing"}, {"happ", "happy"}, {"joy", "happy"}, {"fun", "funny"},
+        {"cry", "crying"}, {"sad", "sad"}, {"ang", "angry"}, {"mad", "angry"},
+        {"surpris", "surprised"}, {"shock", "shocked"}, {"think", "thinking"},
+        {"confus", "confused"}, {"wink", "winking"}, {"lov", "loving"},
+        {"embarrass", "embarrassed"}, {"yum", "delicious"}, {"confiden", "confident"},
+        {"kiss", "kissy"}, {"relax", "relaxed"}, {"sleep", "sleepy"}, {"tired", "sleepy"},
+    };
+    for (const auto& a : kAliases) {
+        if (e.find(a.key) != std::string::npos) {
+            if (auto p = FindExact(a.target)) return *p;
+        }
+    }
+    return kFaces[0].pose;
+}
+
+}  // namespace
+
+// Creates the face objects. The whole normal UI (icons, emoji, chat text)
+// lives inside container_, so hiding that leaves only the status bar
+// (Listening/Speaking) plus the face drawn here.
 void OledDisplay::SetupFace() {
     auto screen = lv_screen_active();
-
     lv_obj_add_flag(container_, LV_OBJ_FLAG_HIDDEN);
 
-    left_eye_ = lv_obj_create(screen);
-    lv_obj_remove_style_all(left_eye_);
-    lv_obj_remove_flag(left_eye_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(left_eye_, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(left_eye_, LV_OPA_COVER, 0);
+    lv_color_t bg = lv_obj_get_style_bg_color(screen, LV_PART_MAIN);
 
-    right_eye_ = lv_obj_create(screen);
-    lv_obj_remove_style_all(right_eye_);
-    lv_obj_remove_flag(right_eye_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(right_eye_, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(right_eye_, LV_OPA_COVER, 0);
+    auto make_box = [screen](lv_color_t color) {
+        lv_obj_t* o = lv_obj_create(screen);
+        lv_obj_remove_style_all(o);
+        lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_style_bg_color(o, color, 0);
+        lv_obj_set_style_bg_opa(o, LV_OPA_COVER, 0);
+        return o;
+    };
 
-    mouth_ = lv_obj_create(screen);
-    lv_obj_remove_style_all(mouth_);
-    lv_obj_remove_flag(mouth_, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(mouth_, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(mouth_, LV_OPA_COVER, 0);
+    left_eye_   = make_box(lv_color_black());
+    right_eye_  = make_box(lv_color_black());
+    left_brow_  = make_box(lv_color_black());
+    right_brow_ = make_box(lv_color_black());
+    mouth_      = make_box(lv_color_black());
+    mouth_mask_ = make_box(bg);   // same colour as the background; hides half of the mouth ellipse
 
+    lv_timer_create(FaceTimerCb, 60, this);   // animation tick every 60 ms
     SetFaceShape("neutral");
 }
 
-// Re-positions and re-sizes the eyes/mouth for a given emotion name.
-// Screen is 128x64; the top 16px are reserved for the status bar.
 void OledDisplay::SetFaceShape(const char* emotion) {
-    if (left_eye_ == nullptr || right_eye_ == nullptr || mouth_ == nullptr) {
+    if (left_eye_ == nullptr) {
         return;
     }
-
     std::string e = (emotion == nullptr) ? "neutral" : emotion;
+    ESP_LOGI(TAG, "Face emotion: %s", e.c_str());   // watch this in the serial log
+    pose_ = FindPose(e);
+    talk_h_ = 0;
+    ApplyFace();
+}
 
-    // Defaults: neutral face
-    int eye_w = 24, eye_h = 24, eye_y = 22, eye_r = 8, eye_gap = 16;
-    int mouth_w = 26, mouth_h = 6, mouth_y = 52, mouth_r = 3;
+// Draws the current pose plus the live animation state (blink, glance, talking).
+void OledDisplay::ApplyFace() {
+    if (left_eye_ == nullptr) {
+        return;
+    }
+    const FacePose& p = pose_;
+    const int half_w = LV_HOR_RES / 2;
+    const int dx = p.look_dx + glance_dx_;
+    const bool blinking = blink_left_ > 0;
 
-    if (e == "happy" || e == "laughing" || e == "funny" || e == "silly") {
-        eye_h = 10; eye_y = 28; eye_r = 5;
-        mouth_w = 40; mouth_h = 10; mouth_y = 48; mouth_r = 5;
-    } else if (e == "sad" || e == "crying") {
-        eye_h = 16; eye_y = 28; eye_r = 8;
-        mouth_w = 16; mouth_h = 4; mouth_y = 56; mouth_r = 2;
-    } else if (e == "angry") {
-        eye_h = 12; eye_y = 26; eye_r = 2;
-        mouth_w = 20; mouth_h = 4; mouth_y = 54; mouth_r = 2;
-    } else if (e == "surprised" || e == "shocked") {
-        eye_w = 26; eye_h = 26; eye_y = 20; eye_r = 13; eye_gap = 14;
-        mouth_w = 14; mouth_h = 14; mouth_y = 48; mouth_r = 7;
-    } else if (e == "sleepy" || e == "relaxed") {
-        eye_h = 4; eye_y = 32; eye_r = 2;
-        mouth_w = 18; mouth_h = 4; mouth_y = 54; mouth_r = 2;
-    } else if (e == "thinking" || e == "confused") {
-        eye_h = 18; eye_y = 26; eye_r = 9;
-        mouth_w = 12; mouth_h = 6; mouth_y = 52; mouth_r = 3;
+    // ---- eyes (kept vertically centred on one line so blinking looks natural)
+    int lh = p.eye_h;
+    int rh = std::max(3, p.eye_h + p.asym);
+    if (p.wink || blinking) lh = 3;
+    if (blinking) rh = 3;
+    const int cy = p.eye_y + p.eye_h / 2;
+    const int lx = half_w - p.eye_gap / 2 - p.eye_w + dx;
+    const int rx = half_w + p.eye_gap / 2 + dx;
+
+    lv_obj_set_size(left_eye_, p.eye_w, lh);
+    lv_obj_set_pos(left_eye_, lx, cy - lh / 2);
+    lv_obj_set_style_radius(left_eye_, p.eye_r, 0);
+    lv_obj_set_size(right_eye_, p.eye_w, rh);
+    lv_obj_set_pos(right_eye_, rx, cy - rh / 2);
+    lv_obj_set_style_radius(right_eye_, p.eye_r, 0);
+
+    // ---- eyebrows
+    if (p.brow == 0) {
+        lv_obj_add_flag(left_brow_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(right_brow_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        const int by = p.eye_y - (p.brow == 1 ? 4 : (p.brow == 2 ? 7 : 6));
+        lv_obj_remove_flag(left_brow_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(right_brow_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_size(left_brow_, p.eye_w, 3);
+        lv_obj_set_pos(left_brow_, lx, by);
+        lv_obj_set_size(right_brow_, p.eye_w, 3);
+        lv_obj_set_pos(right_brow_, rx, by);
     }
 
-    int left_x = (LV_HOR_RES / 2) - (eye_gap / 2) - eye_w;
-    int right_x = (LV_HOR_RES / 2) + (eye_gap / 2);
-    int mouth_x = (LV_HOR_RES / 2) - (mouth_w / 2);
+    // ---- mouth
+    int mh = (talk_h_ > 0) ? talk_h_ : p.mouth_h;
+    const int mw = p.mouth_w;
+    const int mx = half_w - mw / 2 + p.mouth_dx;
 
-    lv_obj_set_size(left_eye_, eye_w, eye_h);
-    lv_obj_set_pos(left_eye_, left_x, eye_y);
-    lv_obj_set_style_radius(left_eye_, eye_r, 0);
+    if (p.mouth_style == 0) {
+        // Plain rounded bar / circle. Keep its centre fixed while it opens and closes.
+        int my = (p.mouth_y + p.mouth_h / 2) - mh / 2;
+        if (my + mh > 63) my = 63 - mh;
+        lv_obj_set_size(mouth_, mw, mh);
+        lv_obj_set_pos(mouth_, mx, my);
+        lv_obj_set_style_radius(mouth_, p.mouth_r, 0);
+        lv_obj_add_flag(mouth_mask_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        // Half ellipse: draw a full ellipse, then cover one half with a background-coloured box.
+        const int flat = (p.mouth_style == 1) ? p.mouth_y : (p.mouth_y + p.mouth_h);
+        mh = std::min(mh, 63 - flat);
+        if (mh < 2) mh = 2;
+        lv_obj_set_size(mouth_, mw, mh * 2);
+        lv_obj_set_pos(mouth_, mx, flat - mh);
+        lv_obj_set_style_radius(mouth_, LV_RADIUS_CIRCLE, 0);
 
-    lv_obj_set_size(right_eye_, eye_w, eye_h);
-    lv_obj_set_pos(right_eye_, right_x, eye_y);
-    lv_obj_set_style_radius(right_eye_, eye_r, 0);
+        lv_obj_remove_flag(mouth_mask_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_size(mouth_mask_, mw + 2, mh + 1);
+        if (p.mouth_style == 1) {
+            lv_obj_set_pos(mouth_mask_, mx - 1, flat - mh - 1);   // hide the top half -> smile
+        } else {
+            lv_obj_set_pos(mouth_mask_, mx - 1, flat);            // hide the bottom half -> frown
+        }
+    }
+}
 
-    lv_obj_set_size(mouth_, mouth_w, mouth_h);
-    lv_obj_set_pos(mouth_, mouth_x, mouth_y);
-    lv_obj_set_style_radius(mouth_, mouth_r, 0);
+// Runs every 60 ms inside the LVGL task: blinking, eye glances, talking mouth.
+void OledDisplay::TickFace() {
+    if (left_eye_ == nullptr) {
+        return;
+    }
+    bool changed = false;
+
+    // Blink: eyes closed for ~180 ms, then wait 2.4-7 s for the next one
+    if (blink_left_ > 0) {
+        if (--blink_left_ == 0) changed = true;
+    } else if (--next_blink_ <= 0) {
+        blink_left_ = 3;
+        next_blink_ = 40 + static_cast<int>(esp_random() % 80);
+        changed = true;
+    }
+
+    // Talking: random mouth opening every 120 ms while the assistant speaks
+    const bool speaking = Application::GetInstance().GetDeviceState() == kDeviceStateSpeaking;
+    if (speaking) {
+        if ((talk_tick_++ & 1) == 0) {
+            const bool plain = (pose_.mouth_style == 0);
+            const int range = plain ? 11 : (pose_.mouth_h + 4);
+            talk_h_ = (plain ? 4 : 3) + static_cast<int>(esp_random() % range);
+            changed = true;
+        }
+    } else if (talk_h_ != 0) {
+        talk_h_ = 0;
+        talk_tick_ = 0;
+        changed = true;
+    }
+
+    // Glance: eyes drift a few pixels left/right now and then
+    if (--next_glance_ <= 0) {
+        static const int kGlance[3] = {-4, 0, 4};
+        glance_dx_ = kGlance[esp_random() % 3];
+        next_glance_ = 40 + static_cast<int>(esp_random() % 60);
+        changed = true;
+    }
+
+    if (changed) {
+        ApplyFace();
+    }
+}
+
+void OledDisplay::FaceTimerCb(lv_timer_t* timer) {
+    auto self = static_cast<OledDisplay*>(lv_timer_get_user_data(timer));
+    if (self != nullptr) {
+        self->TickFace();
+    }
 }
 
 void OledDisplay::SetupUI_128x32() {
