@@ -393,12 +393,12 @@ void OledDisplay::SetupFace() {
         return o;
     };
 
+    mouth_      = make_box(lv_color_black());
+    mouth_mask_ = make_box(bg);   // same colour as the background; hides half of the mouth ellipse
     left_eye_   = make_box(lv_color_black());
     right_eye_  = make_box(lv_color_black());
     left_brow_  = make_box(lv_color_black());
     right_brow_ = make_box(lv_color_black());
-    mouth_      = make_box(lv_color_black());
-    mouth_mask_ = make_box(bg);   // same colour as the background; hides half of the mouth ellipse
 
     lv_timer_create(FaceTimerCb, 60, this);   // animation tick every 60 ms
     SetFaceShape("neutral");
@@ -498,8 +498,8 @@ void OledDisplay::TickFace() {
     if (blink_left_ > 0) {
         if (--blink_left_ == 0) changed = true;
     } else if (--next_blink_ <= 0) {
-        blink_left_ = 3;
-        next_blink_ = 40 + static_cast<int>(esp_random() % 80);
+        blink_left_ = 4;
+        next_blink_ = 30 + static_cast<int>(esp_random() % 60);
         changed = true;
     }
 
