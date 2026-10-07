@@ -196,10 +196,12 @@ esp_err_t Ota::CheckVersion() {
             struct timeval tv;
             double ts = timestamp->valuedouble;
             
-            // 如果有时区偏移，计算本地时间
-            if (cJSON_IsNumber(timezone_offset)) {
-                ts += (timezone_offset->valueint * 60 * 1000); // 转换分钟为毫秒
-            }
+            // Personal-fork customization: use a fixed local time zone instead of
+            // the server's timezone_offset (which can be rounded to whole hours).
+            // Value is minutes east of UTC. India = 330 (UTC+5:30).
+            const int kLocalOffsetMinutes = 330;
+            (void)timezone_offset;
+            ts += (kLocalOffsetMinutes * 60 * 1000);   // minutes -> milliseconds
             
             tv.tv_sec = (time_t)(ts / 1000);  // 转换毫秒为秒
             tv.tv_usec = (suseconds_t)((long long)ts % 1000) * 1000;  // 剩余的毫秒转换为微秒
