@@ -19,6 +19,8 @@
 #include <esp_lcd_panel_sh1106.h>
 #endif
 
+#include "home_nodes.h"
+
 #define TAG "CompactWifiBoard"
 
 class CompactWifiBoard : public WifiBoard {
@@ -150,6 +152,16 @@ private:
     // 物联网初始化，逐步迁移到 MCP 协议
     void InitializeTools() {
         static LampController lamp(LAMP_GPIO);
+        static HomeNodes home({
+        {"fan",        "192.168.1.53", 1},
+        {"light",      "192.168.1.53", 2},
+        {"heater",     "192.168.1.53", 3},
+        {"tv",         "192.168.1.53", 4},
+        {"bed lamp",   "192.168.1.53", 5},
+        {"water pump", "192.168.1.53", 6},
+        {"hall light", "192.168.1.53", 7},
+        {"geyser",     "192.168.1.53", 8},
+        }, "change-me-123");
     }
 
 public:
